@@ -38,21 +38,11 @@ pub fn convert_datetime(datetime: NaiveDateTime) -> DateTime<FixedOffset> {
 }
 
 pub fn remove_slurs(test: &str) -> String {
-  SLUR_REGEX.replace_all(test, "*removed*").to_string()
+  test.to_string()
 }
 
 pub(crate) fn slur_check(test: &str) -> Result<(), Vec<&str>> {
-  let mut matches: Vec<&str> = SLUR_REGEX.find_iter(test).map(|mat| mat.as_str()).collect();
-
-  // Unique
-  matches.sort_unstable();
-  matches.dedup();
-
-  if matches.is_empty() {
-    Ok(())
-  } else {
-    Err(matches)
-  }
+  Ok(())
 }
 
 pub fn check_slurs(text: &str) -> Result<(), ApiError> {
