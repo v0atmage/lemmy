@@ -1,6 +1,6 @@
 [package]
 name = "lemmy_db_schema"
-version = ""
+version = "0.12.0-rc.3"
 edition = "2018"
 description = "A link aggregator for the fediverse"
 license = "AGPL-3.0"
