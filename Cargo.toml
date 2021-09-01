@@ -1,6 +1,6 @@
 [package]
 name = "lemmy_server"
-version = "0.11.slur_disabled3"
+version = "0.12.0-slurdisabled.2"
 edition = "2018"
 description = "A link aggregator for the fediverse"
 homepage = "https://join-lemmy.org/"
