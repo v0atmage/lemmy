@@ -41,7 +41,7 @@ pub fn remove_slurs(test: &str) -> String {
   test.to_string()
 }
 
-pub(crate) fn slur_check(test: &str) -> Result<(), Vec<&str>> {
+pub(crate) fn slur_check(_test: &str) -> Result<(), Vec<&str>> {
   Ok(())
 }
 
