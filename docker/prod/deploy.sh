@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #git checkout main
 
 # Creating the new tag
