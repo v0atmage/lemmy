@@ -1,6 +1,6 @@
 [package]
 name = "lemmy_server"
-version = "test1"
+version = "test2"
 edition = "2018"
 description = "A link aggregator for the fediverse"
 homepage = "https://join-lemmy.org/"
