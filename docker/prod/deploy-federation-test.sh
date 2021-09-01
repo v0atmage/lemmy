@@ -3,8 +3,8 @@ set -e
 
 TAG="federation-test"
 
-sudo docker build ../../ --file Dockerfile -t "dessalines/lemmy:$TAG"
-sudo docker save "dessalines/lemmy:$TAG" -o "$TAG.tar"
+sudo docker build ../../ --file Dockerfile -t "v0atmage/lemmy:$TAG"
+sudo docker save "v0atmage/lemmy:$TAG" -o "$TAG.tar"
 sudo chown "$(id -u):$(id -g)" "$TAG.tar"
 
 scp "$TAG.tar" enterprise.lemmy.ml:

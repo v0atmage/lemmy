@@ -64,7 +64,7 @@ steps:
         from_secret: docker_username
       password:
         from_secret: docker_password
-      repo: dessalines/lemmy
+      repo: v0atmage/lemmy
       tags:
         - dev-linux-amd64
     when:
@@ -78,8 +78,8 @@ steps:
         from_secret: docker_username
       password:
         from_secret: docker_password
-      target: "dessalines/lemmy:dev"
-      template: "dessalines/lemmy:dev-OS-ARCH"
+      target: "v0atmage/lemmy:dev"
+      template: "v0atmage/lemmy:dev-OS-ARCH"
       platforms:
         - linux/amd64
         - linux/arm64
@@ -96,7 +96,7 @@ steps:
         from_secret: docker_username
       password:
         from_secret: docker_password
-      repo: dessalines/lemmy
+      repo: v0atmage/lemmy
       auto_tag: true
       auto_tag_suffix: linux-amd64
     when:
@@ -110,8 +110,8 @@ steps:
         from_secret: docker_username
       password:
         from_secret: docker_password
-      target: "dessalines/lemmy:${DRONE_TAG}"
-      template: "dessalines/lemmy:${DRONE_TAG}-OS-ARCH"
+      target: "v0atmage/lemmy:${DRONE_TAG}"
+      template: "v0atmage/lemmy:${DRONE_TAG}-OS-ARCH"
       platforms:
         - linux/amd64
         - linux/arm64
@@ -205,7 +205,7 @@ steps:
         from_secret: docker_username
       password:
         from_secret: docker_password
-      repo: dessalines/lemmy
+      repo: v0atmage/lemmy
       tags:
         - dev-linux-arm64
     when:
@@ -219,8 +219,8 @@ steps:
         from_secret: docker_username
       password:
         from_secret: docker_password
-      target: "dessalines/lemmy:dev"
-      template: "dessalines/lemmy:dev-OS-ARCH"
+      target: "v0atmage/lemmy:dev"
+      template: "v0atmage/lemmy:dev-OS-ARCH"
       platforms:
         - linux/amd64
         - linux/arm64
@@ -237,7 +237,7 @@ steps:
         from_secret: docker_username
       password:
         from_secret: docker_password
-      repo: dessalines/lemmy
+      repo: v0atmage/lemmy
       auto_tag: true
       auto_tag_suffix: linux-arm64
     when:
@@ -251,8 +251,8 @@ steps:
         from_secret: docker_username
       password:
         from_secret: docker_password
-      target: "dessalines/lemmy:${DRONE_TAG}"
-      template: "dessalines/lemmy:${DRONE_TAG}-OS-ARCH"
+      target: "v0atmage/lemmy:${DRONE_TAG}"
+      template: "v0atmage/lemmy:${DRONE_TAG}-OS-ARCH"
       platforms:
         - linux/amd64
         - linux/arm64

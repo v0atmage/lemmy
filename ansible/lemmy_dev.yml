@@ -62,7 +62,7 @@
           dest: '/etc/nginx/sites-enabled/lemmy.conf'
           mode: '0644'
       vars:
-        lemmy_docker_image: "dessalines/lemmy:dev"
+        lemmy_docker_image: "v0atmage/lemmy:dev"
         lemmy_docker_ui_image: "dessalines/lemmy-ui:{{ lookup('file', 'VERSION') }}"
         lemmy_port: "8536"
         lemmy_ui_port: "1235"
@@ -124,7 +124,7 @@
       enabled: yes
       state: started
 
-  # cant pull here because that fails due to lemmy:dev (without dessalines/) not being on docker hub, but that shouldnt
+  # cant pull here because that fails due to lemmy:dev (without v0atmage/) not being on docker hub, but that shouldnt
   # be a problem for testing
   - name: start docker-compose
     docker_compose:
