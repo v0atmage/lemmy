@@ -1,9 +1,12 @@
-ARG RUST_BUILDER_IMAGE=ekidd/rust-musl-builder:1.47.0
+
+ARG toolchain=unstable
+
+ARG RUST_BUILDER_IMAGE=ekidd/rust-musl-builder:latest
 
 # Cargo chef plan
 FROM $RUST_BUILDER_IMAGE as planner
 WORKDIR /app
-RUN cargo install cargo-chef --version 0.1.6
+RUN cargo install cargo-chef --version 0.1.28
 
 # Copy dirs
 COPY ./ ./
@@ -15,7 +18,7 @@ RUN cargo chef prepare --recipe-path recipe.json
 FROM $RUST_BUILDER_IMAGE as cacher
 ARG CARGO_BUILD_TARGET=x86_64-unknown-linux-musl
 WORKDIR /app
-RUN cargo install cargo-chef --version 0.1.6
+RUN cargo install cargo-chef --version 0.1.28
 COPY --from=planner /app/recipe.json ./recipe.json
 RUN sudo chown -R rust:rust .
 RUN cargo chef cook --release --target ${CARGO_BUILD_TARGET} --recipe-path recipe.json
