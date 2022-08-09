@@ -39,7 +39,7 @@ pub(crate) fn slur_check<'a>(
   _test: &'a str,
   _slur_regex: &'a Option<Regex>,
 ) -> Result<(), Vec<&'a str>> {
-   Ok() 
+   Ok(())
 }
 
 pub fn check_slurs(text: &str, slur_regex: &Option<Regex>) -> Result<(), LemmyError> {
