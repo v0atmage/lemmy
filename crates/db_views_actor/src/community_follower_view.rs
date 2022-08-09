@@ -1,21 +1,14 @@
+use crate::structs::CommunityFollowerView;
 use diesel::{result::Error, *};
-use lemmy_db_queries::{ToSafe, ViewToVec};
 use lemmy_db_schema::{
+  newtypes::{CommunityId, PersonId},
   schema::{community, community_follower, person},
   source::{
     community::{Community, CommunitySafe},
     person::{Person, PersonSafe},
   },
-  CommunityId,
-  PersonId,
+  traits::{ToSafe, ViewToVec},
 };
-use serde::Serialize;
-
-#[derive(Debug, Serialize, Clone)]
-pub struct CommunityFollowerView {
-  pub community: CommunitySafe,
-  pub follower: PersonSafe,
-}
 
 type CommunityFollowerViewTuple = (CommunitySafe, PersonSafe);
 
@@ -29,7 +22,7 @@ impl CommunityFollowerView {
         Person::safe_columns_tuple(),
       ))
       .filter(community_follower::community_id.eq(community_id))
-      .order_by(community_follower::published)
+      .order_by(community::title)
       .load::<CommunityFollowerViewTuple>(conn)?;
 
     Ok(Self::from_tuple_to_vec(res))
@@ -44,7 +37,7 @@ impl CommunityFollowerView {
         Person::safe_columns_tuple(),
       ))
       .filter(community_follower::person_id.eq(person_id))
-      .order_by(community_follower::published)
+      .order_by(community::title)
       .load::<CommunityFollowerViewTuple>(conn)?;
 
     Ok(Self::from_tuple_to_vec(res))
@@ -55,10 +48,10 @@ impl ViewToVec for CommunityFollowerView {
   type DbTuple = CommunityFollowerViewTuple;
   fn from_tuple_to_vec(items: Vec<Self::DbTuple>) -> Vec<Self> {
     items
-      .iter()
+      .into_iter()
       .map(|a| Self {
-        community: a.0.to_owned(),
-        follower: a.1.to_owned(),
+        community: a.0,
+        follower: a.1,
       })
       .collect::<Vec<Self>>()
   }

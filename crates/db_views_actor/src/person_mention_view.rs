@@ -1,14 +1,8 @@
-use diesel::{result::Error, *};
-use lemmy_db_queries::{
-  aggregates::comment_aggregates::CommentAggregates,
-  functions::hot_rank,
-  limit_and_offset,
-  MaybeOptional,
-  SortType,
-  ToSafe,
-  ViewToVec,
-};
+use crate::structs::PersonMentionView;
+use diesel::{dsl::*, result::Error, *};
 use lemmy_db_schema::{
+  aggregates::structs::CommentAggregates,
+  newtypes::{PersonId, PersonMentionId},
   schema::{
     comment,
     comment_aggregates,
@@ -31,26 +25,11 @@ use lemmy_db_schema::{
     person_mention::PersonMention,
     post::Post,
   },
-  PersonId,
-  PersonMentionId,
+  traits::{ToSafe, ViewToVec},
+  utils::{functions::hot_rank, limit_and_offset},
+  CommentSortType,
 };
-use serde::Serialize;
-
-#[derive(Debug, PartialEq, Serialize, Clone)]
-pub struct PersonMentionView {
-  pub person_mention: PersonMention,
-  pub comment: Comment,
-  pub creator: PersonSafe,
-  pub post: Post,
-  pub community: CommunitySafe,
-  pub recipient: PersonSafeAlias1,
-  pub counts: CommentAggregates,
-  pub creator_banned_from_community: bool, // Left Join to CommunityPersonBan
-  pub subscribed: bool,                    // Left join to CommunityFollower
-  pub saved: bool,                         // Left join to CommentSaved
-  pub creator_blocked: bool,               // Left join to PersonBlock
-  pub my_vote: Option<i16>,                // Left join to CommentLike
-}
+use typed_builder::TypedBuilder;
 
 type PersonMentionViewTuple = (
   PersonMention,
@@ -85,7 +64,7 @@ impl PersonMentionView {
       recipient,
       counts,
       creator_banned_from_community,
-      subscribed,
+      follower,
       saved,
       creator_blocked,
       my_vote,
@@ -101,7 +80,12 @@ impl PersonMentionView {
         community_person_ban::table.on(
           community::id
             .eq(community_person_ban::community_id)
-            .and(community_person_ban::person_id.eq(comment::creator_id)),
+            .and(community_person_ban::person_id.eq(comment::creator_id))
+            .and(
+              community_person_ban::expires
+                .is_null()
+                .or(community_person_ban::expires.gt(now)),
+            ),
         ),
       )
       .left_join(
@@ -157,67 +141,40 @@ impl PersonMentionView {
       recipient,
       counts,
       creator_banned_from_community: creator_banned_from_community.is_some(),
-      subscribed: subscribed.is_some(),
+      subscribed: CommunityFollower::to_subscribed_type(&follower),
       saved: saved.is_some(),
       creator_blocked: creator_blocked.is_some(),
       my_vote,
     })
   }
+
+  /// Gets the number of unread mentions
+  pub fn get_unread_mentions(conn: &PgConnection, my_person_id: PersonId) -> Result<i64, Error> {
+    use diesel::dsl::*;
+
+    person_mention::table
+      .filter(person_mention::recipient_id.eq(my_person_id))
+      .filter(person_mention::read.eq(false))
+      .select(count(person_mention::id))
+      .first::<i64>(conn)
+  }
 }
 
-pub struct PersonMentionQueryBuilder<'a> {
+#[derive(TypedBuilder)]
+#[builder(field_defaults(default))]
+pub struct PersonMentionQuery<'a> {
+  #[builder(!default)]
   conn: &'a PgConnection,
   my_person_id: Option<PersonId>,
   recipient_id: Option<PersonId>,
-  sort: Option<SortType>,
+  sort: Option<CommentSortType>,
   unread_only: Option<bool>,
+  show_bot_accounts: Option<bool>,
   page: Option<i64>,
   limit: Option<i64>,
 }
 
-impl<'a> PersonMentionQueryBuilder<'a> {
-  pub fn create(conn: &'a PgConnection) -> Self {
-    PersonMentionQueryBuilder {
-      conn,
-      my_person_id: None,
-      recipient_id: None,
-      sort: None,
-      unread_only: None,
-      page: None,
-      limit: None,
-    }
-  }
-
-  pub fn sort<T: MaybeOptional<SortType>>(mut self, sort: T) -> Self {
-    self.sort = sort.get_optional();
-    self
-  }
-
-  pub fn unread_only<T: MaybeOptional<bool>>(mut self, unread_only: T) -> Self {
-    self.unread_only = unread_only.get_optional();
-    self
-  }
-
-  pub fn recipient_id<T: MaybeOptional<PersonId>>(mut self, recipient_id: T) -> Self {
-    self.recipient_id = recipient_id.get_optional();
-    self
-  }
-
-  pub fn my_person_id<T: MaybeOptional<PersonId>>(mut self, my_person_id: T) -> Self {
-    self.my_person_id = my_person_id.get_optional();
-    self
-  }
-
-  pub fn page<T: MaybeOptional<i64>>(mut self, page: T) -> Self {
-    self.page = page.get_optional();
-    self
-  }
-
-  pub fn limit<T: MaybeOptional<i64>>(mut self, limit: T) -> Self {
-    self.limit = limit.get_optional();
-    self
-  }
-
+impl<'a> PersonMentionQuery<'a> {
   pub fn list(self) -> Result<Vec<PersonMentionView>, Error> {
     use diesel::dsl::*;
 
@@ -235,7 +192,12 @@ impl<'a> PersonMentionQueryBuilder<'a> {
         community_person_ban::table.on(
           community::id
             .eq(community_person_ban::community_id)
-            .and(community_person_ban::person_id.eq(comment::creator_id)),
+            .and(community_person_ban::person_id.eq(comment::creator_id))
+            .and(
+              community_person_ban::expires
+                .is_null()
+                .or(community_person_ban::expires.gt(now)),
+            ),
         ),
       )
       .left_join(
@@ -290,29 +252,20 @@ impl<'a> PersonMentionQueryBuilder<'a> {
       query = query.filter(person_mention::read.eq(false));
     }
 
-    query = match self.sort.unwrap_or(SortType::Hot) {
-      SortType::Hot | SortType::Active => query
-        .order_by(hot_rank(comment_aggregates::score, comment_aggregates::published).desc())
-        .then_order_by(comment_aggregates::published.desc()),
-      SortType::New | SortType::MostComments | SortType::NewComments => {
-        query.order_by(comment::published.desc())
-      }
-      SortType::TopAll => query.order_by(comment_aggregates::score.desc()),
-      SortType::TopYear => query
-        .filter(comment::published.gt(now - 1.years()))
-        .order_by(comment_aggregates::score.desc()),
-      SortType::TopMonth => query
-        .filter(comment::published.gt(now - 1.months()))
-        .order_by(comment_aggregates::score.desc()),
-      SortType::TopWeek => query
-        .filter(comment::published.gt(now - 1.weeks()))
-        .order_by(comment_aggregates::score.desc()),
-      SortType::TopDay => query
-        .filter(comment::published.gt(now - 1.days()))
-        .order_by(comment_aggregates::score.desc()),
+    if !self.show_bot_accounts.unwrap_or(true) {
+      query = query.filter(person::bot_account.eq(false));
     };
 
-    let (limit, offset) = limit_and_offset(self.page, self.limit);
+    query = match self.sort.unwrap_or(CommentSortType::Hot) {
+      CommentSortType::Hot => query
+        .then_order_by(hot_rank(comment_aggregates::score, comment_aggregates::published).desc())
+        .then_order_by(comment_aggregates::published.desc()),
+      CommentSortType::New => query.then_order_by(comment::published.desc()),
+      CommentSortType::Old => query.then_order_by(comment::published.asc()),
+      CommentSortType::Top => query.order_by(comment_aggregates::score.desc()),
+    };
+
+    let (limit, offset) = limit_and_offset(self.page, self.limit)?;
 
     let res = query
       .limit(limit)
@@ -327,17 +280,17 @@ impl ViewToVec for PersonMentionView {
   type DbTuple = PersonMentionViewTuple;
   fn from_tuple_to_vec(items: Vec<Self::DbTuple>) -> Vec<Self> {
     items
-      .iter()
+      .into_iter()
       .map(|a| Self {
-        person_mention: a.0.to_owned(),
-        comment: a.1.to_owned(),
-        creator: a.2.to_owned(),
-        post: a.3.to_owned(),
-        community: a.4.to_owned(),
-        recipient: a.5.to_owned(),
-        counts: a.6.to_owned(),
+        person_mention: a.0,
+        comment: a.1,
+        creator: a.2,
+        post: a.3,
+        community: a.4,
+        recipient: a.5,
+        counts: a.6,
         creator_banned_from_community: a.7.is_some(),
-        subscribed: a.8.is_some(),
+        subscribed: CommunityFollower::to_subscribed_type(&a.8),
         saved: a.9.is_some(),
         creator_blocked: a.10.is_some(),
         my_vote: a.11,

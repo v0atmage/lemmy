@@ -1,25 +1,15 @@
+use crate::structs::PersonViewSafe;
 use diesel::{dsl::*, result::Error, *};
-use lemmy_db_queries::{
-  aggregates::person_aggregates::PersonAggregates,
-  fuzzy_search,
-  limit_and_offset,
-  MaybeOptional,
-  SortType,
-  ToSafe,
-  ViewToVec,
-};
 use lemmy_db_schema::{
+  aggregates::structs::PersonAggregates,
+  newtypes::PersonId,
   schema::{person, person_aggregates},
   source::person::{Person, PersonSafe},
-  PersonId,
+  traits::{ToSafe, ViewToVec},
+  utils::{fuzzy_search, limit_and_offset},
+  SortType,
 };
-use serde::Serialize;
-
-#[derive(Debug, Serialize, Clone)]
-pub struct PersonViewSafe {
-  pub person: PersonSafe,
-  pub counts: PersonAggregates,
-}
+use typed_builder::TypedBuilder;
 
 type PersonViewSafeTuple = (PersonSafe, PersonAggregates);
 
@@ -48,14 +38,23 @@ impl PersonViewSafe {
     let banned = person::table
       .inner_join(person_aggregates::table)
       .select((Person::safe_columns_tuple(), person_aggregates::all_columns))
-      .filter(person::banned.eq(true))
+      .filter(
+        person::banned.eq(true).and(
+          person::ban_expires
+            .is_null()
+            .or(person::ban_expires.gt(now)),
+        ),
+      )
       .load::<PersonViewSafeTuple>(conn)?;
 
     Ok(Self::from_tuple_to_vec(banned))
   }
 }
 
-pub struct PersonQueryBuilder<'a> {
+#[derive(TypedBuilder)]
+#[builder(field_defaults(default))]
+pub struct PersonQuery<'a> {
+  #[builder(!default)]
   conn: &'a PgConnection,
   sort: Option<SortType>,
   search_term: Option<String>,
@@ -63,37 +62,7 @@ pub struct PersonQueryBuilder<'a> {
   limit: Option<i64>,
 }
 
-impl<'a> PersonQueryBuilder<'a> {
-  pub fn create(conn: &'a PgConnection) -> Self {
-    PersonQueryBuilder {
-      conn,
-      search_term: None,
-      sort: None,
-      page: None,
-      limit: None,
-    }
-  }
-
-  pub fn sort<T: MaybeOptional<SortType>>(mut self, sort: T) -> Self {
-    self.sort = sort.get_optional();
-    self
-  }
-
-  pub fn search_term<T: MaybeOptional<String>>(mut self, search_term: T) -> Self {
-    self.search_term = search_term.get_optional();
-    self
-  }
-
-  pub fn page<T: MaybeOptional<i64>>(mut self, page: T) -> Self {
-    self.page = page.get_optional();
-    self
-  }
-
-  pub fn limit<T: MaybeOptional<i64>>(mut self, limit: T) -> Self {
-    self.limit = limit.get_optional();
-    self
-  }
-
+impl<'a> PersonQuery<'a> {
   pub fn list(self) -> Result<Vec<PersonViewSafe>, Error> {
     let mut query = person::table
       .inner_join(person_aggregates::table)
@@ -114,6 +83,7 @@ impl<'a> PersonQueryBuilder<'a> {
       SortType::New | SortType::MostComments | SortType::NewComments => {
         query.order_by(person::published.desc())
       }
+      SortType::Old => query.order_by(person::published.asc()),
       SortType::TopAll => query.order_by(person_aggregates::comment_score.desc()),
       SortType::TopYear => query
         .filter(person::published.gt(now - 1.years()))
@@ -129,7 +99,7 @@ impl<'a> PersonQueryBuilder<'a> {
         .order_by(person_aggregates::comment_score.desc()),
     };
 
-    let (limit, offset) = limit_and_offset(self.page, self.limit);
+    let (limit, offset) = limit_and_offset(self.page, self.limit)?;
     query = query.limit(limit).offset(offset);
 
     let res = query.load::<PersonViewSafeTuple>(self.conn)?;
@@ -142,10 +112,10 @@ impl ViewToVec for PersonViewSafe {
   type DbTuple = PersonViewSafeTuple;
   fn from_tuple_to_vec(items: Vec<Self::DbTuple>) -> Vec<Self> {
     items
-      .iter()
+      .into_iter()
       .map(|a| Self {
-        person: a.0.to_owned(),
-        counts: a.1.to_owned(),
+        person: a.0,
+        counts: a.1,
       })
       .collect::<Vec<Self>>()
   }

@@ -1,24 +1,16 @@
+use crate::structs::ModBanFromCommunityView;
 use diesel::{result::Error, *};
-use lemmy_db_queries::{limit_and_offset, ToSafe, ViewToVec};
 use lemmy_db_schema::{
+  newtypes::{CommunityId, PersonId},
   schema::{community, mod_ban_from_community, person, person_alias_1},
   source::{
     community::{Community, CommunitySafe},
     moderator::ModBanFromCommunity,
     person::{Person, PersonAlias1, PersonSafe, PersonSafeAlias1},
   },
-  CommunityId,
-  PersonId,
+  traits::{ToSafe, ViewToVec},
+  utils::limit_and_offset,
 };
-use serde::Serialize;
-
-#[derive(Debug, Serialize, Clone)]
-pub struct ModBanFromCommunityView {
-  pub mod_ban_from_community: ModBanFromCommunity,
-  pub moderator: PersonSafe,
-  pub community: CommunitySafe,
-  pub banned_person: PersonSafeAlias1,
-}
 
 type ModBanFromCommunityViewTuple = (
   ModBanFromCommunity,
@@ -57,7 +49,7 @@ impl ModBanFromCommunityView {
       query = query.filter(mod_ban_from_community::community_id.eq(community_id));
     };
 
-    let (limit, offset) = limit_and_offset(page, limit);
+    let (limit, offset) = limit_and_offset(page, limit)?;
 
     let res = query
       .limit(limit)
@@ -73,12 +65,12 @@ impl ViewToVec for ModBanFromCommunityView {
   type DbTuple = ModBanFromCommunityViewTuple;
   fn from_tuple_to_vec(items: Vec<Self::DbTuple>) -> Vec<Self> {
     items
-      .iter()
+      .into_iter()
       .map(|a| Self {
-        mod_ban_from_community: a.0.to_owned(),
-        moderator: a.1.to_owned(),
-        community: a.2.to_owned(),
-        banned_person: a.3.to_owned(),
+        mod_ban_from_community: a.0,
+        moderator: a.1,
+        community: a.2,
+        banned_person: a.3,
       })
       .collect::<Vec<Self>>()
   }

@@ -1,6 +1,7 @@
+use crate::structs::ModRemovePostView;
 use diesel::{result::Error, *};
-use lemmy_db_queries::{limit_and_offset, ToSafe, ViewToVec};
 use lemmy_db_schema::{
+  newtypes::{CommunityId, PersonId},
   schema::{community, mod_remove_post, person, post},
   source::{
     community::{Community, CommunitySafe},
@@ -8,18 +9,9 @@ use lemmy_db_schema::{
     person::{Person, PersonSafe},
     post::Post,
   },
-  CommunityId,
-  PersonId,
+  traits::{ToSafe, ViewToVec},
+  utils::limit_and_offset,
 };
-use serde::Serialize;
-
-#[derive(Debug, Serialize, Clone)]
-pub struct ModRemovePostView {
-  pub mod_remove_post: ModRemovePost,
-  pub moderator: PersonSafe,
-  pub post: Post,
-  pub community: CommunitySafe,
-}
 
 type ModRemovePostViewTuple = (ModRemovePost, PersonSafe, Post, CommunitySafe);
 
@@ -51,7 +43,7 @@ impl ModRemovePostView {
       query = query.filter(mod_remove_post::mod_person_id.eq(mod_person_id));
     };
 
-    let (limit, offset) = limit_and_offset(page, limit);
+    let (limit, offset) = limit_and_offset(page, limit)?;
 
     let res = query
       .limit(limit)
@@ -67,12 +59,12 @@ impl ViewToVec for ModRemovePostView {
   type DbTuple = ModRemovePostViewTuple;
   fn from_tuple_to_vec(items: Vec<Self::DbTuple>) -> Vec<Self> {
     items
-      .iter()
+      .into_iter()
       .map(|a| Self {
-        mod_remove_post: a.0.to_owned(),
-        moderator: a.1.to_owned(),
-        post: a.2.to_owned(),
-        community: a.3.to_owned(),
+        mod_remove_post: a.0,
+        moderator: a.1,
+        post: a.2,
+        community: a.3,
       })
       .collect::<Vec<Self>>()
   }

@@ -1,20 +1,14 @@
+use crate::structs::CommunityBlockView;
 use diesel::{result::Error, *};
-use lemmy_db_queries::{ToSafe, ViewToVec};
 use lemmy_db_schema::{
+  newtypes::PersonId,
   schema::{community, community_block, person},
   source::{
     community::{Community, CommunitySafe},
     person::{Person, PersonSafe},
   },
-  PersonId,
+  traits::{ToSafe, ViewToVec},
 };
-use serde::Serialize;
-
-#[derive(Debug, Serialize, Clone)]
-pub struct CommunityBlockView {
-  pub person: PersonSafe,
-  pub community: CommunitySafe,
-}
 
 type CommunityBlockViewTuple = (PersonSafe, CommunitySafe);
 
@@ -39,10 +33,10 @@ impl ViewToVec for CommunityBlockView {
   type DbTuple = CommunityBlockViewTuple;
   fn from_tuple_to_vec(items: Vec<Self::DbTuple>) -> Vec<Self> {
     items
-      .iter()
+      .into_iter()
       .map(|a| Self {
-        person: a.0.to_owned(),
-        community: a.1.to_owned(),
+        person: a.0,
+        community: a.1,
       })
       .collect::<Vec<Self>>()
   }

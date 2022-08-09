@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+sudo docker-compose down
+
 sudo DOCKER_BUILDKIT=1 docker build ../../ --file ../dev/volume_mount.dockerfile -t lemmy-federation:latest
 
 for Item in alpha beta gamma delta epsilon ; do

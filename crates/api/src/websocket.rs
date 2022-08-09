@@ -1,7 +1,7 @@
 use crate::Perform;
 use actix_web::web::Data;
-use lemmy_api_common::{get_local_user_view_from_jwt, websocket::*};
-use lemmy_utils::{ConnectionId, LemmyError};
+use lemmy_api_common::{utils::get_local_user_view_from_jwt, websocket::*};
+use lemmy_utils::{error::LemmyError, ConnectionId};
 use lemmy_websocket::{
   messages::{JoinCommunityRoom, JoinModRoom, JoinPostRoom, JoinUserRoom},
   LemmyContext,
@@ -11,13 +11,15 @@ use lemmy_websocket::{
 impl Perform for UserJoin {
   type Response = UserJoinResponse;
 
+  #[tracing::instrument(skip(context, websocket_id))]
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
     websocket_id: Option<ConnectionId>,
   ) -> Result<UserJoinResponse, LemmyError> {
     let data: &UserJoin = self;
-    let local_user_view = get_local_user_view_from_jwt(&data.auth, context.pool()).await?;
+    let local_user_view =
+      get_local_user_view_from_jwt(&data.auth, context.pool(), context.secret()).await?;
 
     if let Some(ws_id) = websocket_id {
       context.chat_server().do_send(JoinUserRoom {
@@ -34,6 +36,7 @@ impl Perform for UserJoin {
 impl Perform for CommunityJoin {
   type Response = CommunityJoinResponse;
 
+  #[tracing::instrument(skip(context, websocket_id))]
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
@@ -56,6 +59,7 @@ impl Perform for CommunityJoin {
 impl Perform for ModJoin {
   type Response = ModJoinResponse;
 
+  #[tracing::instrument(skip(context, websocket_id))]
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
@@ -78,6 +82,7 @@ impl Perform for ModJoin {
 impl Perform for PostJoin {
   type Response = PostJoinResponse;
 
+  #[tracing::instrument(skip(context, websocket_id))]
   async fn perform(
     &self,
     context: &Data<LemmyContext>,

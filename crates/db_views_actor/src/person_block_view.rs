@@ -1,17 +1,11 @@
+use crate::structs::PersonBlockView;
 use diesel::{result::Error, *};
-use lemmy_db_queries::{ToSafe, ViewToVec};
 use lemmy_db_schema::{
+  newtypes::PersonId,
   schema::{person, person_alias_1, person_block},
   source::person::{Person, PersonAlias1, PersonSafe, PersonSafeAlias1},
-  PersonId,
+  traits::{ToSafe, ViewToVec},
 };
-use serde::Serialize;
-
-#[derive(Debug, Serialize, Clone)]
-pub struct PersonBlockView {
-  pub person: PersonSafe,
-  pub target: PersonSafeAlias1,
-}
 
 type PersonBlockViewTuple = (PersonSafe, PersonSafeAlias1);
 
@@ -36,10 +30,10 @@ impl ViewToVec for PersonBlockView {
   type DbTuple = PersonBlockViewTuple;
   fn from_tuple_to_vec(items: Vec<Self::DbTuple>) -> Vec<Self> {
     items
-      .iter()
+      .into_iter()
       .map(|a| Self {
-        person: a.0.to_owned(),
-        target: a.1.to_owned(),
+        person: a.0,
+        target: a.1,
       })
       .collect::<Vec<Self>>()
   }
