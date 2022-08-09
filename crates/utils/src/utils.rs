@@ -31,7 +31,7 @@ pub fn convert_datetime(datetime: NaiveDateTime) -> DateTime<FixedOffset> {
   DateTime::<FixedOffset>::from_utc(datetime, FixedOffset::east(0))
 }
 
-pub fn remove_slurs(test: &str, slur_regex: &Option<Regex>) -> String {
+pub fn remove_slurs(test: &str, _slur_regex: &Option<Regex>) -> String {
     test.to_string()
 }
 
