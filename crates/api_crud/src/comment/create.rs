@@ -84,10 +84,18 @@ impl PerformCrud for CreateComment {
       }
     }
 
+    // if no language is set, copy language from parent post/comment
+    let parent_language = parent_opt
+      .as_ref()
+      .map(|p| p.language_id)
+      .unwrap_or(post.language_id);
+    let language_id = Some(data.language_id.unwrap_or(parent_language));
+
     let comment_form = CommentForm {
       content: content_slurs_removed,
       post_id: data.post_id,
       creator_id: local_user_view.person.id,
+      language_id,
       ..CommentForm::default()
     };
 
@@ -137,7 +145,7 @@ impl PerformCrud for CreateComment {
       score: 1,
     };
 
-    let like = move |conn: &'_ _| CommentLike::like(conn, &like_form);
+    let like = move |conn: &mut _| CommentLike::like(conn, &like_form);
     blocking(context.pool(), like)
       .await?
       .map_err(|e| LemmyError::from_error_message(e, "couldnt_like_comment"))?;

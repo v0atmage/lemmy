@@ -8,7 +8,7 @@ pub mod deletion;
 pub mod following;
 pub mod voting;
 
-#[derive(Clone, Debug, Display, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Display, Deserialize, Serialize, PartialEq, Eq)]
 pub enum CreateOrUpdateType {
   Create,
   Update,
@@ -52,6 +52,7 @@ mod tests {
   #[test]
   fn test_parse_lotide_activities() {
     test_json::<CreateOrUpdatePost>("assets/lotide/activities/create_page.json").unwrap();
+    test_json::<CreateOrUpdatePost>("assets/lotide/activities/create_page_image.json").unwrap();
     test_json::<CreateOrUpdateComment>("assets/lotide/activities/create_note_reply.json").unwrap();
   }
 

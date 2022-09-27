@@ -178,7 +178,7 @@ fn get_sort_type(info: web::Query<Params>) -> Result<SortType, ParseError> {
 
 #[tracing::instrument(skip_all)]
 fn get_feed_user(
-  conn: &PgConnection,
+  conn: &mut PgConnection,
   sort_type: &SortType,
   user_name: &str,
   protocol_and_hostname: &str,
@@ -209,7 +209,7 @@ fn get_feed_user(
 
 #[tracing::instrument(skip_all)]
 fn get_feed_community(
-  conn: &PgConnection,
+  conn: &mut PgConnection,
   sort_type: &SortType,
   community_name: &str,
   protocol_and_hostname: &str,
@@ -243,7 +243,7 @@ fn get_feed_community(
 
 #[tracing::instrument(skip_all)]
 fn get_feed_front(
-  conn: &PgConnection,
+  conn: &mut PgConnection,
   jwt_secret: &str,
   sort_type: &SortType,
   jwt: &str,
@@ -256,9 +256,7 @@ fn get_feed_front(
   let posts = PostQuery::builder()
     .conn(conn)
     .listing_type(Some(ListingType::Subscribed))
-    .my_person_id(Some(local_user.person_id))
-    .show_bot_accounts(Some(local_user.show_bot_accounts))
-    .show_read_posts(Some(local_user.show_read_posts))
+    .local_user(Some(&local_user))
     .sort(Some(*sort_type))
     .limit(Some(RSS_FETCH_LIMIT))
     .build()
@@ -282,7 +280,7 @@ fn get_feed_front(
 
 #[tracing::instrument(skip_all)]
 fn get_feed_inbox(
-  conn: &PgConnection,
+  conn: &mut PgConnection,
   jwt_secret: &str,
   jwt: &str,
   protocol_and_hostname: &str,

@@ -4,7 +4,10 @@ use crate::{
   local_instance,
   mentions::collect_non_local_mentions,
   objects::{read_from_string_or_source, verify_is_remote_object},
-  protocol::{objects::note::Note, Source},
+  protocol::{
+    objects::{note::Note, LanguageTag},
+    Source,
+  },
   PostOrComment,
 };
 use activitypub_federation::{
@@ -20,6 +23,7 @@ use lemmy_db_schema::{
   source::{
     comment::{Comment, CommentForm},
     community::Community,
+    language::Language,
     person::Person,
     post::Post,
   },
@@ -105,6 +109,11 @@ impl ApubObject for ApubComment {
     } else {
       ObjectId::<PostOrComment>::new(post.ap_id)
     };
+    let language = self.language_id;
+    let language = blocking(context.pool(), move |conn| {
+      Language::read_from_id(conn, language)
+    })
+    .await??;
     let maa =
       collect_non_local_mentions(&self, ObjectId::new(community.actor_id), context, &mut 0).await?;
 
@@ -121,6 +130,8 @@ impl ApubObject for ApubComment {
       published: Some(convert_datetime(self.published)),
       updated: self.updated.map(convert_datetime),
       tag: maa.tags,
+      distinguished: Some(self.distinguished),
+      language: LanguageTag::new(language),
     };
 
     Ok(note)
@@ -175,6 +186,12 @@ impl ApubObject for ApubComment {
     let content = read_from_string_or_source(&note.content, &note.media_type, &note.source);
     let content_slurs_removed = remove_slurs(&content, &context.settings().slur_regex());
 
+    let language = note.language.map(|l| l.identifier);
+    let language = blocking(context.pool(), move |conn| {
+      Language::read_id_from_code_opt(conn, language.as_deref())
+    })
+    .await??;
+
     let form = CommentForm {
       creator_id: creator.id,
       post_id: post.id,
@@ -184,7 +201,9 @@ impl ApubObject for ApubComment {
       updated: note.updated.map(|u| u.naive_local()),
       deleted: None,
       ap_id: Some(note.id.into()),
+      distinguished: note.distinguished,
       local: Some(false),
+      language_id: language,
     };
     let parent_comment_path = parent_comment.map(|t| t.0.path);
     let comment = blocking(context.pool(), move |conn| {
@@ -230,16 +249,18 @@ pub(crate) mod tests {
   }
 
   fn cleanup(data: (ApubPerson, ApubCommunity, ApubPost, ApubSite), context: &LemmyContext) {
-    Post::delete(&*context.pool().get().unwrap(), data.2.id).unwrap();
-    Community::delete(&*context.pool().get().unwrap(), data.1.id).unwrap();
-    Person::delete(&*context.pool().get().unwrap(), data.0.id).unwrap();
-    Site::delete(&*context.pool().get().unwrap(), data.3.id).unwrap();
+    let conn = &mut context.pool().get().unwrap();
+    Post::delete(conn, data.2.id).unwrap();
+    Community::delete(conn, data.1.id).unwrap();
+    Person::delete(conn, data.0.id).unwrap();
+    Site::delete(conn, data.3.id).unwrap();
   }
 
   #[actix_rt::test]
   #[serial]
   pub(crate) async fn test_parse_lemmy_comment() {
     let context = init_context();
+    let conn = &mut context.pool().get().unwrap();
     let url = Url::parse("https://enterprise.lemmy.ml/comment/38741").unwrap();
     let data = prepare_comment_test(&url, &context).await;
 
@@ -261,7 +282,7 @@ pub(crate) mod tests {
     let to_apub = comment.into_apub(&context).await.unwrap();
     assert_json_include!(actual: json, expected: to_apub);
 
-    Comment::delete(&*context.pool().get().unwrap(), comment_id).unwrap();
+    Comment::delete(conn, comment_id).unwrap();
     cleanup(data, &context);
   }
 
@@ -269,6 +290,7 @@ pub(crate) mod tests {
   #[serial]
   async fn test_parse_pleroma_comment() {
     let context = init_context();
+    let conn = &mut context.pool().get().unwrap();
     let url = Url::parse("https://enterprise.lemmy.ml/comment/38741").unwrap();
     let data = prepare_comment_test(&url, &context).await;
 
@@ -296,7 +318,7 @@ pub(crate) mod tests {
     assert!(!comment.local);
     assert_eq!(request_counter, 0);
 
-    Comment::delete(&*context.pool().get().unwrap(), comment.id).unwrap();
+    Comment::delete(conn, comment.id).unwrap();
     cleanup(data, &context);
   }
 

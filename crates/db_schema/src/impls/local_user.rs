@@ -1,7 +1,10 @@
 use crate::{
   newtypes::LocalUserId,
   schema::local_user::dsl::*,
-  source::local_user::{LocalUser, LocalUserForm},
+  source::{
+    local_user::{LocalUser, LocalUserForm},
+    local_user_language::LocalUserLanguage,
+  },
   traits::Crud,
   utils::naive_now,
 };
@@ -23,7 +26,7 @@ mod safe_settings_type {
     theme,
     default_sort_type,
     default_listing_type,
-    lang,
+    interface_language,
     show_avatars,
     send_notifications_to_email,
     validator_time,
@@ -48,7 +51,7 @@ mod safe_settings_type {
         theme,
         default_sort_type,
         default_listing_type,
-        lang,
+        interface_language,
         show_avatars,
         send_notifications_to_email,
         validator_time,
@@ -64,7 +67,7 @@ mod safe_settings_type {
 }
 
 impl LocalUser {
-  pub fn register(conn: &PgConnection, form: &LocalUserForm) -> Result<Self, Error> {
+  pub fn register(conn: &mut PgConnection, form: &LocalUserForm) -> Result<Self, Error> {
     let mut edited_user = form.clone();
     let password_hash = form
       .password_encrypted
@@ -76,7 +79,7 @@ impl LocalUser {
   }
 
   pub fn update_password(
-    conn: &PgConnection,
+    conn: &mut PgConnection,
     local_user_id: LocalUserId,
     new_password: &str,
   ) -> Result<Self, Error> {
@@ -90,14 +93,14 @@ impl LocalUser {
       .get_result::<Self>(conn)
   }
 
-  pub fn set_all_users_email_verified(conn: &PgConnection) -> Result<Vec<Self>, Error> {
+  pub fn set_all_users_email_verified(conn: &mut PgConnection) -> Result<Vec<Self>, Error> {
     diesel::update(local_user)
       .set(email_verified.eq(true))
       .get_results::<Self>(conn)
   }
 
   pub fn set_all_users_registration_applications_accepted(
-    conn: &PgConnection,
+    conn: &mut PgConnection,
   ) -> Result<Vec<Self>, Error> {
     diesel::update(local_user)
       .set(accepted_application.eq(true))
@@ -108,19 +111,22 @@ impl LocalUser {
 impl Crud for LocalUser {
   type Form = LocalUserForm;
   type IdType = LocalUserId;
-  fn read(conn: &PgConnection, local_user_id: LocalUserId) -> Result<Self, Error> {
+  fn read(conn: &mut PgConnection, local_user_id: LocalUserId) -> Result<Self, Error> {
     local_user.find(local_user_id).first::<Self>(conn)
   }
-  fn delete(conn: &PgConnection, local_user_id: LocalUserId) -> Result<usize, Error> {
+  fn delete(conn: &mut PgConnection, local_user_id: LocalUserId) -> Result<usize, Error> {
     diesel::delete(local_user.find(local_user_id)).execute(conn)
   }
-  fn create(conn: &PgConnection, form: &LocalUserForm) -> Result<Self, Error> {
-    insert_into(local_user)
+  fn create(conn: &mut PgConnection, form: &LocalUserForm) -> Result<Self, Error> {
+    let local_user_ = insert_into(local_user)
       .values(form)
-      .get_result::<Self>(conn)
+      .get_result::<Self>(conn)?;
+    // initialize with all languages
+    LocalUserLanguage::update_user_languages(conn, None, local_user_.id)?;
+    Ok(local_user_)
   }
   fn update(
-    conn: &PgConnection,
+    conn: &mut PgConnection,
     local_user_id: LocalUserId,
     form: &LocalUserForm,
   ) -> Result<Self, Error> {

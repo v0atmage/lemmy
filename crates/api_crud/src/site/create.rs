@@ -76,10 +76,11 @@ impl PerformCrud for CreateSite {
       public_key: Some(keypair.public_key),
       default_theme: data.default_theme.clone(),
       default_post_listing_type: data.default_post_listing_type.clone(),
+      hide_modlog_mod_names: data.hide_modlog_mod_names,
       ..SiteForm::default()
     };
 
-    let create_site = move |conn: &'_ _| Site::create(conn, &site_form);
+    let create_site = move |conn: &mut _| Site::create(conn, &site_form);
     blocking(context.pool(), create_site)
       .await?
       .map_err(|e| LemmyError::from_error_message(e, "site_already_exists"))?;
